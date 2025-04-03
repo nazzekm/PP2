@@ -1,92 +1,123 @@
 import pygame
+import math
 
-def main():
-    pygame.init()
-    screen = pygame.display.set_mode((640, 480))
-    clock = pygame.time.Clock()
+pygame.init()
 
-    radius = 15
-    x, y = 0, 0
-    mode = 'blue'
-    draw_mode = 'line'  # 'line', 'rect', 'circle', 'eraser'
-    points = []
+# размеры окна
+screen = pygame.display.set_mode((800, 600))
+base_layer = pygame.Surface((800, 600))
+clock = pygame.time.Clock()
 
-    while True:
-        pressed = pygame.key.get_pressed()
+ColorLine = 'red'
 
-        alt_held = pressed[pygame.K_LALT] or pressed[pygame.K_RALT]
-        ctrl_held = pressed[pygame.K_LCTRL] or pressed[pygame.K_RCTRL]
+# изначальные значения 
+mouse_pos = pygame.mouse.get_pos()
+prev_pos = mouse_pos
+current_pos = mouse_pos
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w and ctrl_held:
-                    return
-                if event.key == pygame.K_F4 and alt_held:
-                    return
-                if event.key == pygame.K_ESCAPE:
-                    return
+THICKNESS = 5  
 
-                # Выбор цвета
-                if event.key == pygame.K_r:
-                    mode = 'red'
-                elif event.key == pygame.K_g:
-                    mode = 'green'
-                elif event.key == pygame.K_b:
-                    mode = 'blue'
+MODE_PENCIL = 0
+MODE_LINE = 1
+MODE_RECT = 2
+MODE_CIRCLE = 3
+MODE_ERASER = 4
 
-                # Выбор инструмента
-                if event.key == pygame.K_l:
-                    draw_mode = 'line'
-                elif event.key == pygame.K_c:
-                    draw_mode = 'circle'
-                elif event.key == pygame.K_t:
-                    draw_mode = 'rect'
-                elif event.key == pygame.K_e:
-                    draw_mode = 'eraser'
+current_mode = MODE_PENCIL
+drawing = False  
+start_pos = (0, 0)  
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # ЛКМ увеличивает радиус
-                    radius = min(50, radius + 2)
-                elif event.button == 3:  # ПКМ уменьшает радиус
-                    radius = max(5, radius - 2)
+running = True
+while running:
+    current_pos = pygame.mouse.get_pos()  
 
-            if event.type == pygame.MOUSEMOTION:
-                position = event.pos
-                points.append((position, draw_mode))
-                points = points[-256:]  # Ограничение по точкам
+    # все события 
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False 
 
-        screen.fill((0, 0, 0))
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1: 
+                drawing = True  
+                start_pos = current_pos
+                prev_pos = current_pos
 
-        # Отрисовка элементов
-        for i in range(len(points) - 1):
-            drawTool(screen, i, points[i][0], points[i + 1][0], radius, mode, points[i][1])
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1 and drawing: 
+                drawing = False 
+                if current_mode == MODE_LINE:
+                    pygame.draw.line(base_layer, ColorLine, start_pos, current_pos, THICKNESS)
+                elif current_mode == MODE_RECT:
+                    rect = pygame.Rect(min(start_pos[0], current_pos[0]), min(start_pos[1], current_pos[1]), abs(current_pos[0] - start_pos[0]), abs(current_pos[1] - start_pos[1]))
+                    pygame.draw.rect(base_layer, ColorLine, rect, THICKNESS)
+                elif current_mode == MODE_CIRCLE:
+                    radius = int(math.hypot(current_pos[0] - start_pos[0], current_pos[1] - start_pos[1]))  
+                    pygame.draw.circle(base_layer, ColorLine, start_pos, radius, THICKNESS)
+                
+        if event.type == pygame.KEYDOWN:
+            # менять режимы
+            if event.key == pygame.K_1:
+                current_mode = MODE_LINE
+            elif event.key == pygame.K_2:
+                current_mode = MODE_RECT
+            elif event.key == pygame.K_3:
+                current_mode = MODE_CIRCLE
+            elif event.key == pygame.K_0:
+                current_mode = MODE_PENCIL
+            elif event.key == pygame.K_e:
+                current_mode = MODE_ERASER 
+                
+            if event.key == pygame.K_EQUALS:
+                THICKNESS += 1
+            elif event.key == pygame.K_MINUS and THICKNESS > 1:
+                THICKNESS -= 1
 
-        pygame.display.flip()
-        clock.tick(60)
+            elif event.key == pygame.K_g:
+                ColorLine = 'green'
+            elif event.key == pygame.K_b:
+                ColorLine = 'blue'
+            elif event.key == pygame.K_r:
+                ColorLine = 'red'
 
-def drawTool(screen, index, start, end, width, color_mode, draw_mode):
-    """Функция рисует линии, прямоугольники, круги и стирает"""
-    c1 = max(0, min(255, 2 * index - 256))
-    c2 = max(0, min(255, 2 * index))
+            # очистка экрана
+            elif event.key == pygame.K_c:
+                base_layer.fill((0, 0, 0))
 
-    if color_mode == 'blue':
-        color = (c1, c1, c2)
-    elif color_mode == 'red':
-        color = (c2, c1, c1)
-    elif color_mode == 'green':
-        color = (c1, c2, c1)
-    elif color_mode == 'eraser':
-        color = (0, 0, 0)
+    # очищаем экран
+    screen.fill((0, 0, 0))
+    screen.blit(base_layer, (0, 0))  
 
-    if draw_mode == 'line':
-        pygame.draw.line(screen, color, start, end, width)
-    elif draw_mode == 'rect':
-        pygame.draw.rect(screen, color, (*start, width, width))
-    elif draw_mode == 'circle':
-        pygame.draw.circle(screen, color, start, width // 2)
-    elif draw_mode == 'eraser':
-        pygame.draw.circle(screen, (0, 0, 0), start, width)
+    if drawing:
+        if current_mode == MODE_PENCIL:
+            pygame.draw.line(base_layer, ColorLine, prev_pos, current_pos, THICKNESS)  
+            prev_pos = current_pos
+        elif current_mode == MODE_LINE:
+            pygame.draw.line(screen, ColorLine, start_pos, current_pos, THICKNESS)
+        elif current_mode == MODE_RECT:
+            rect = pygame.Rect(min(start_pos[0], current_pos[0]), min(start_pos[1], current_pos[1]), abs(current_pos[0] - start_pos[0]), abs(current_pos[1] - start_pos[1]))
+            pygame.draw.rect(screen, ColorLine, rect, THICKNESS)
+        elif current_mode == MODE_CIRCLE:
+            radius = int(math.hypot(current_pos[0] - start_pos[0], current_pos[1] - start_pos[1]))  
+            pygame.draw.circle(screen, ColorLine, start_pos, radius, THICKNESS)
 
-main()
+    # ластик 
+    if current_mode == MODE_ERASER:
+        pygame.draw.circle(screen, (0, 0, 0), current_pos, THICKNESS) # черный круг
+        
+        # стираем линии
+        pygame.draw.line(base_layer, (0, 0, 0), prev_pos, current_pos, THICKNESS)
+        prev_pos = current_pos
+
+    # подсказки
+    font = pygame.font.SysFont(None, 24)
+    mode_text = ["Карандаш (0)", "Линия (1)", "Прямоугольник (2)", "Круг (3)", "Ластик (E)"][current_mode]
+    text_surface = font.render(f"Режим: {mode_text}", True, (255, 255, 255))
+    screen.blit(text_surface, (10, 10))
+
+    next_text = font.render(f"Цвет: {ColorLine}", True, "white")
+    screen.blit(next_text, (10, 40))
+
+    pygame.display.flip()  
+    clock.tick(60)  
+
+pygame.quit()  
