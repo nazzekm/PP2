@@ -9,13 +9,13 @@ GRID_SIZE = 20
 GRID_WIDTH = WIDTH // GRID_SIZE
 GRID_HEIGHT = HEIGHT // GRID_SIZE
 
-BACKGROUND = (245, 222, 179)  # Бежевый
-GRID_LIGHT = (255, 165, 79)  # Светло-оранжевый
-GRID_DARK = (255, 140, 0)  # Темно-оранжевый
-SNAKE_COLOR = (0, 100, 0)  # Темно-зеленый
-FOOD_COLOR = (220, 20, 60)  # Красный
-TEXT_COLOR = (139, 69, 19)  # Темно-коричневый
-GAME_OVER_BG = (255, 69, 0)  # Огненно-красный
+BACKGROUND = (245, 222, 179)  
+GRID_LIGHT = (255, 165, 79)  
+GRID_DARK = (255, 140, 0)  
+SNAKE_COLOR = (0, 100, 0)  
+FOOD_COLOR = (220, 20, 60)  
+TEXT_COLOR = (139, 69, 19)  
+GAME_OVER_BG = (255, 69, 0)  
 
 UP = (0, -1)
 DOWN = (0, 1)
@@ -27,7 +27,7 @@ pygame.display.set_caption("Snake Game")
 clock = pygame.time.Clock()
 
 def draw_grid(surface):
-    """Рисует сетку на поле"""
+    """сетка"""
     for y in range(GRID_HEIGHT):
         for x in range(GRID_WIDTH):
             rect = pygame.Rect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE)
@@ -36,7 +36,6 @@ def draw_grid(surface):
 
 class Snake:
     def __init__(self):
-        """Создает змейку"""
         self.length = 1
         self.positions = [(WIDTH // 2, HEIGHT // 2)]
         self.direction = random.choice([UP, DOWN, LEFT, RIGHT])
@@ -70,7 +69,6 @@ class Snake:
         return True
 
     def draw(self, surface):
-        """Рисует змейку"""
         for pos in self.positions:
             rect = pygame.Rect(pos[0], pos[1], GRID_SIZE, GRID_SIZE)
             pygame.draw.rect(surface, self.color, rect)
@@ -78,13 +76,11 @@ class Snake:
 
 class Food:
     def __init__(self, snake_positions):
-        """Создает еду, избегая змейки"""
         self.position = (0, 0)
         self.color = FOOD_COLOR
         self.randomize_position(snake_positions)
 
     def randomize_position(self, snake_positions):
-        """Генерирует новую позицию для еды"""
         while True:
             new_pos = (random.randint(0, GRID_WIDTH - 1) * GRID_SIZE,
                        random.randint(0, GRID_HEIGHT - 1) * GRID_SIZE)
@@ -93,13 +89,11 @@ class Food:
                 break
 
     def draw(self, surface):
-        """Рисует еду"""
         rect = pygame.Rect(self.position[0], self.position[1], GRID_SIZE, GRID_SIZE)
         pygame.draw.rect(surface, self.color, rect)
         pygame.draw.rect(surface, GRID_LIGHT, rect, 1)
 
 def show_text(surface, text, size, x, y):
-    """Отображает текст на экране"""
     font = pygame.font.SysFont("monospace", size)
     label = font.render(text, True, TEXT_COLOR)
     surface.blit(label, (x, y))

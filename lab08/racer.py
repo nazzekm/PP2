@@ -44,7 +44,7 @@ class Player(pygame.sprite.Sprite):
         if self.rect.left < 0:
             self.rect.left = 0  # запрет лев
         if self.rect.right > WIDTH:
-            self.rect.right = WIDTH  # запреи прав
+            self.rect.right = WIDTH  # запрет прав
 
 class Coin(pygame.sprite.Sprite):
     def __init__(self):
