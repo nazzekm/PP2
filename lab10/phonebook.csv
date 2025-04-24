@@ -1,3 +1,5 @@
-first_name,last_name,phone_number
-John,Doe,87784443018
-Jane,Smith,87076401870
+name,surname,phone
+John,Doe,1234567890
+Jane,Smith,9876543210
+Alice,Johnson,5551234567
+Nikita,Lee,1112223333

@@ -2,129 +2,154 @@ import psycopg2
 import csv
 
 conn = psycopg2.connect(
-    dbname="postgres",
-    user="postgres",
-    password="12345678",
-    host="localhost",
-    port="5432"
+    host="localhost", dbname="lab10", user="postgres",
+    password="12345678", port="5432"
 )
 
 cur = conn.cursor()
 
-cur.execute("""
-    CREATE TABLE IF NOT EXISTS contacts (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        number VARCHAR(20) UNIQUE NOT NULL
-    );
-""")
-conn.commit()
-
-# поиск контактов 
-create_function_sql = """
-CREATE OR REPLACE FUNCTION search_contacts(pattern TEXT)
-RETURNS TABLE(id INTEGER, name VARCHAR, number VARCHAR) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT c.id, c.name, c.number
-    FROM contacts as c
-    WHERE c.name ILIKE '%' || pattern || '%' OR c.number ILIKE '%' || pattern || '%';
-END;
-$$ LANGUAGE plpgsql;
-"""
-
-cur.execute(create_function_sql)
-conn.commit()
-
-# добавление или обновление
-text_for_procedure = """
-CREATE OR REPLACE PROCEDURE add_or_update_contact(p_name VARCHAR, p_number VARCHAR)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM contacts WHERE name = p_name) THEN
-        UPDATE contacts
-        SET number = p_number
-        WHERE name = p_name;
-    ELSIF EXISTS (SELECT 1 FROM contacts WHERE number = p_number) THEN
-        UPDATE contacts
-        SET name = p_name
-        WHERE number = p_number;
-    ELSE
-        INSERT INTO contacts(name, number)
-        VALUES (p_name, p_number);
-    END IF;
-END;
-$$;
-"""
-
-cur.execute(text_for_procedure)
-conn.commit()
-
-# удаление данных
-text_for_delete_procedure = """
-CREATE OR REPLACE PROCEDURE delete_data(dna VARCHAR, dnum VARCHAR)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    DELETE FROM contacts as c
-    WHERE (dna IS NOT NULL AND c.name = dna)
-        OR (dnum IS NOT NULL AND c.number = dnum);
-END;
-$$;
-"""
-
-cur.execute(text_for_delete_procedure)
-conn.commit()
-
-csv_file_path = "C:\\Users\\User\\Desktop\\code\\git-lessons\\lab10\\phonebook.csv"
- 
-
-with open(csv_file_path, 'r') as csvfile:
-    reader = csv.reader(csvfile)
-    next(reader)  
-
-    for row in reader:
-        name = row[0]
-        number = row[1]
-
-        cur.execute("INSERT INTO contacts (name, number) VALUES (%s, %s);", (name, number))
-
-conn.commit()
-
-print("Данные успешно загружены в базу данных.")
-
-pattern = input("Введите имя или часть номера: ")
-cur.execute("SELECT * FROM search_contacts(%s);", (pattern,))
-results = cur.fetchall()
-
-if results:
-    print("\nНайденные контакты:\n---------------------------")
-    print("id\tname\tnumber\n---------------------------")
-    for row in results:
-        print(f"{row[0]}\t{row[1]}\t{row[2]}")
-    print("---------------------------")
-else:
-    print("Совпадений не найдено.")
-
-name = input("Введите имя для добавления или обновления: ")
-number = input("Введите номер телефона: ")
-cur.execute("CALL add_or_update_contact(%s, %s);", (name, number))
-conn.commit()
-print("Контакт добавлен или обновлен.")
-
-name = input("Введите имя для удаления (или оставьте пустым): ")
-number = input("Введите номер для удаления (или оставьте пустым): ")
-
-name = name if name != "" else None
-number = number if number != "" else None
-
-if name is None and number is None:
-    print("Нужно ввести хотя бы имя или номер.")
-else:
-    cur.execute("CALL delete_data(%s, %s);", (name, number))
+def insert_or_update_user(name, surname, phone):
+    cur.execute("CALL insert_or_update_user(%s, %s, %s)", (name, surname, phone))
     conn.commit()
-    print("Контакт удалён, если он существовал.")
+    print("User inserted or updated successfully.")
+
+# несколько пользователей с проверкой телефона
+def insert_multiple_users(names, surnames, phones):
+    cur.execute("CALL insert_multiple_users(%s, %s, %s)", (names, surnames, phones))
+    conn.commit()
+    print("Multiple users inserted successfully.")
+    
+# несколько пользователей 
+def insert_multiple_console():
+    names = input("Enter names separated by commas: ").split(',')
+    surnames = input("Enter surnames separated by commas: ").split(',')
+    phones = input("Enter phone numbers separated by commas: ").split(',')
+
+    if len(names) != len(surnames) or len(names) != len(phones):
+        print("The number of names, surnames, and phone numbers must be the same!")
+        return
+
+    # отдельно
+    for i in range(len(names)):
+        insert_or_update_user(names[i].strip(), surnames[i].strip(), phones[i].strip())
+
+# один пользователь
+def insert_or_update_user(name, surname, phone):
+    cur.execute("CALL insert_or_update_user(%s, %s, %s)", (name, surname, phone))
+    conn.commit()
+    print(f"User {name} {surname} inserted or updated successfully.")
+
+
+
+# вставка вручную
+def insert_console():
+    name = input("Name: ")
+    surname = input("Surname: ")
+    phone = input("Phone: ")
+    
+    insert_or_update_user(name, surname, phone)
+
+
+def insert_csv():
+    path = input("Enter CSV file path: ")
+    with open(path, 'r') as f:
+        reader = csv.reader(f)
+        next(reader)  
+        for row in reader:
+            insert_or_update_user(row[0], row[1], row[2])
+
+# обновление
+def update_column(column):
+    old_value = input(f"Enter current {column}: ")
+    new_value = input(f"Enter new {column}: ")
+    cur.execute(f"UPDATE phonebook SET {column} = %s WHERE {column} = %s", (new_value, old_value))
+    conn.commit()
+    print(f"{column} updated successfully.")
+
+# удаление
+def delete_user():
+    field = input("Delete by (name/phone): ").lower()
+    
+    if field not in ["name", "phone"]:
+        print("Invalid input. Choose 'name' or 'phone'.")
+        return
+
+    value = input(f"Enter {field} to delete: ")
+    cur.execute(f"DELETE FROM phonebook WHERE {field} = %s", (value,))
+    conn.commit()
+    print("User deleted if match was found.")
+
+# запрос данных по колонке
+def query_by_column(column):
+    value = input(f"Enter {column}: ")
+    cur.execute(f"SELECT * FROM phonebook WHERE {column} = %s", (value,))
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+
+# вывод
+def show_all():
+    cur.execute("SELECT * FROM phonebook")
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+
+# поиск по шаблону
+def search_by_pattern():
+    pattern = input("Enter pattern: ")
+    cur.execute("SELECT * FROM phonebook WHERE name ILIKE %s OR surname ILIKE %s OR phone ILIKE %s",
+                (f'%{pattern}%', f'%{pattern}%', f'%{pattern}%'))
+    rows = cur.fetchall()
+    for row in rows:
+        print(row)
+
+def menu():
+    while True:
+        print("""
+        === MENU ===
+        [i] Insert (console or csv)
+        [u] Update
+        [d] Delete
+        [q] Query
+        [s] Show all
+        [p] Pattern search
+        [m] Insert multiple users manually
+        [f] Finish
+        """)
+        cmd = input("Choose command: ").lower()
+
+        if cmd == "i":
+            opt = input('Type "csv" to upload file or "con" to enter manually: ')
+            if opt == "con": insert_console()
+            elif opt == "csv": insert_csv()
+
+        elif cmd == "m":
+            insert_multiple_console()
+
+        elif cmd == "u":
+            col = input("Which column to update (name/surname/phone): ")
+            if col in ["name", "surname", "phone"]:
+                update_column(col)
+
+        elif cmd == "d":
+            delete_user()
+
+        elif cmd == "q":
+            col = input("Search by (name/phone): ")
+            if col in ["name", "phone"]:
+                query_by_column(col)
+
+        elif cmd == "s":
+            show_all()
+
+        elif cmd == "p":
+            search_by_pattern()
+
+        elif cmd == "f":
+            break
+
+
+menu()
 
 cur.close()
 conn.close()

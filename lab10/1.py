@@ -2,141 +2,190 @@ import psycopg2
 import csv
 
 conn = psycopg2.connect(
-    dbname="PhoneBook",  
-    user="postgres",     
-    password="12345678",   
-    host="localhost",    
-    port="5432"          
+    host="localhost", dbname="lab10", user="postgres",
+    password="12345678", port="5432"
 )
-conn.set_client_encoding('UTF8')  # кодировка
 
-# создание курсора 
 cur = conn.cursor()
 
-def create_table():
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS PhoneBook(
-            id SERIAL PRIMARY KEY,
-            first_name VARCHAR(50),
-            last_name VARCHAR(50),
-            phone_number VARCHAR(15) UNIQUE
-        );
-    """)
-    conn.commit()
+# создание таблицы 
+cur.execute("""
+            CREATE TABLE IF NOT EXISTS phonebook (
+            user_id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            surname VARCHAR(255) NOT NULL,
+            phone VARCHAR(255) NOT NULL UNIQUE
+            )
+""")
+conn.commit()
 
-# вставка данных
-def insert_from_csv():
+# вставка данных 
+def insert_console():
     try:
-        with open(r"C:\Users\User\Desktop\code\git-lessons\lab10\phonebook.csv", newline='', encoding='utf-8') as csv_file:
-            r = csv.reader(csv_file)
-            for row in r:
-                if len(row) != 3:
-                    continue  
-                cur.execute("""
-                    INSERT INTO PhoneBook (first_name, last_name, phone_number)
-                    VALUES (%s, %s, %s);
-                """, (row[0], row[1], row[2]))
-            conn.commit()
-        print("Данные успешно загружены из CSV файла.")
-    except Exception as e:
-        print(f"Ошибка при загрузке данных: {e}")
+        name = input("Name: ")
+        surname = input("Surname: ")
+        phone = input("Phone: ")
 
-# вставка данных вручную
-def insert_from_console():
-    first_name = input("Enter first name: ")
-    last_name = input("Enter last name: ")
-    phone_number = input("Enter phone number: ")
-    cur.execute("""
-        INSERT INTO PhoneBook (first_name, last_name, phone_number)
-        VALUES (%s, %s, %s);
-    """, (first_name, last_name, phone_number))
-    conn.commit()
+        # дублирование номера
+        cur.execute("SELECT * FROM phonebook WHERE phone = %s", (phone,))
+        if cur.fetchone():
+            print("Phone number already exists in the database.")
+            return
+
+        # вставка
+        cur.execute("INSERT INTO phonebook (name, surname, phone) VALUES (%s, %s, %s)", (name, surname, phone))
+        conn.commit()
+        print("Contact added successfully.")
+
+    except Exception as e:
+        conn.rollback()  # откатить 
+        print(f"Error inserting data: {e}")
+
+# вставка данных CSV
+def insert_csv():
+    try:
+        path = input("Enter CSV file path: ")
+        with open(path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader)
+            for row in reader:
+                if len(row) != 3: # корректность 
+                    continue
+
+                name, surname, phone = row
+
+                # дублирование 
+                cur.execute("SELECT * FROM phonebook WHERE phone = %s", (phone,))
+                if cur.fetchone():
+                    print(f"Phone number {phone} already exists. Skipping entry.")
+                    continue
+
+                # вставка 
+                cur.execute("INSERT INTO phonebook (name, surname, phone) VALUES (%s, %s, %s)", (name, surname, phone))
+            conn.commit()
+            print("Data successfully uploaded from CSV.")
+    except Exception as e:
+        conn.rollback()  # откатить 
+        print(f"Error uploading data from CSV: {e}")
 
 # обновление данных
-def update_contact():
-    user_id = input("Enter user ID to update: ")
-    new_first_name = input("Enter new first name: ")
-    new_phone_number = input("Enter new phone number: ")
-    cur.execute("""
-        UPDATE PhoneBook
-        SET first_name = %s, phone_number = %s
-        WHERE id = %s;
-    """, (new_first_name, new_phone_number, user_id))
-    conn.commit()
+def update_column(column):
+    try:
+        old_value = input(f"Enter current {column}: ")
+        new_value = input(f"Enter new {column}: ")
 
-# удаление данных
+        # выполнение 
+        cur.execute(f"UPDATE phonebook SET {column} = %s WHERE {column} = %s", (new_value, old_value))
+        conn.commit()
+
+        print(f"{column} updated successfully.")
+
+        cur.execute(f"SELECT * FROM phonebook WHERE {column} = %s", (new_value,))
+        rows = cur.fetchall()
+
+        if rows:
+            print("Updated contact details:")
+            for row in rows:
+                print(row) 
+        else:
+            print("No contact found with the updated information.")
+
+    except Exception as e:
+        conn.rollback()  
+        print(f"Error updating data: {e}")
+
+
+# удаление контакта
 def delete_contact():
-    print("1. Delete by name\n2. Delete by phone number")
-    choice = int(input())
-    if choice == 1:
-        name = input("Enter name to delete: ")
-        cur.execute("""
-            DELETE FROM PhoneBook
-            WHERE first_name = %s;
-        """, (name,))
-    elif choice == 2:
-        phone_number = input("Enter phone number to delete: ")
-        cur.execute("""
-            DELETE FROM PhoneBook
-            WHERE phone_number = %s;
-        """, (phone_number,))
-    conn.commit()
+    try:
+        print("Choose the parameter for deletion:")
+        print("[1] Delete by Name")
+        print("[2] Delete by Surname")
+        print("[3] Delete by Phone Number")
 
-# поиск контактов
-def search_contacts():
-    print("1. Search by name\n2. Search by phone number\n3. Show all")
-    choice = int(input())
-    if choice == 1:
-        name = input("Enter name to search: ")
-        cur.execute("""
-            SELECT * FROM PhoneBook
-            WHERE first_name = %s;
-        """, (name,))
-    elif choice == 2:
-        phone_number = input("Enter phone number to search: ")
-        cur.execute("""
-            SELECT * FROM PhoneBook
-            WHERE phone_number = %s;
-        """, (phone_number,))
-    elif choice == 3:
-        cur.execute("SELECT * FROM PhoneBook;")
-    rows = cur.fetchall()
-    for row in rows:
-        print(row)
+        choice = input("Enter your choice (1/2/3): ")
 
-def main():
-    create_table()
+        if choice == "1":
+            name = input("Enter name to delete: ")
+            cur.execute("DELETE FROM phonebook WHERE name = %s", (name,))
+        elif choice == "2":
+            surname = input("Enter surname to delete: ")
+            cur.execute("DELETE FROM phonebook WHERE surname = %s", (surname,))
+        elif choice == "3":
+            phone = input("Enter phone to delete: ")
+            cur.execute("DELETE FROM phonebook WHERE phone = %s", (phone,))
+        else:
+            print("Invalid choice. Please choose 1, 2, or 3.")
+            return
+        
+        conn.commit()
+        print("Contact deleted successfully.")
+    
+    except Exception as e:
+        conn.rollback()  
+        print(f"Error deleting contact: {e}")
+
+# запрос
+def query_by_column(column):
+    try:
+        value = input(f"Enter {column}: ")
+        if column == "id": 
+            column = "user_id"
+        cur.execute(f"SELECT * FROM phonebook WHERE {column} = %s", (value,))
+        rows = cur.fetchall()
+        for row in rows:
+            print(row)  
+    except Exception as e:
+        print(f"Error querying data: {e}")
+
+# вывод 
+def show_all():
+    try:
+        cur.execute("SELECT * FROM phonebook")
+        rows = cur.fetchall()
+        for row in rows:
+            print(row)  
+    except Exception as e:
+        print(f"Error showing all data: {e}")
+
+def menu():
     while True:
-        print("\nChoose an option:")
-        print("1. Insert data (from CSV or console)")
-        print("2. Delete contact")
-        print("3. Update contact")
-        print("4. Search contacts")
-        print("5. Quit")
-        option = int(input())
-        
-        if option == 1:
-            print("1. Insert from CSV\n2. Insert from console")
-            method = int(input())
-            if method == 1:
-                insert_from_csv()
-            elif method == 2:
-                insert_from_console()
-        
-        elif option == 2:
+        print("""
+        === MENU ===
+        [i] Insert (console or csv)
+        [u] Update
+        [d] Delete
+        [q] Query
+        [s] Show all
+        [f] Finish
+        """)
+        cmd = input("Choose command: ").lower()
+
+        if cmd == "i":
+            opt = input('Type "csv" to upload file or "con" to enter manually: ')
+            if opt == "con": insert_console()
+            elif opt == "csv": insert_csv()
+
+        elif cmd == "u":
+            col = input("Which column to update (name/surname/phone): ")
+            if col in ["name", "surname", "phone"]:
+                update_column(col)
+
+        elif cmd == "d":
             delete_contact()
-        
-        elif option == 3:
-            update_contact()
-        
-        elif option == 4:
-            search_contacts()
-        
-        elif option == 5:
+
+        elif cmd == "q":
+            col = input("Search by (id/name/surname/phone): ")
+            if col in ["id", "name", "surname", "phone"]:
+                query_by_column(col)
+
+        elif cmd == "s":
+            show_all()
+
+        elif cmd == "f":
             break
 
-    cur.close()
-    conn.close()
+menu()
 
-if __name__ == "__main__":
-    main()
+cur.close()
+conn.close()
